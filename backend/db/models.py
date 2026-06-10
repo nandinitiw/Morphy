@@ -28,7 +28,7 @@ class Position(Base):
     classification = Column(String)                 # "blunder" | "mistake" | "inaccuracy" | "good"
     clock_remaining = Column(Float)                 # Seconds left on clock
     is_your_move = Column(Boolean)
-    tactical_motif = Column(String)                 # e.g. "fork", "pin", "back_rank" — classifier
+    tactical_motif = Column(String)                 # e.g. "missed_fork", "missed_skewer" — classifier
     embedding = Column(JSON)                        # FEN vector, stored as list
     game = relationship("Game", back_populates="positions")
 
