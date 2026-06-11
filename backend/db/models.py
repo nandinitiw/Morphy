@@ -50,3 +50,17 @@ class CoachingSession(Base):
     created_at = Column(DateTime)
     report = Column(String)                         # Full coaching report text
     games_analyzed = Column(JSON)                   # List of game IDs included
+
+
+class IngestJob(Base):
+    __tablename__ = "ingest_jobs"
+    id = Column(String, primary_key=True)
+    username = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    games_ingested = Column(Integer, default=0)
+    games_analyzed = Column(Integer, default=0)
+    games_total = Column(Integer, default=0)
+    weakness_themes = Column(Integer, default=0)
+    error = Column(String)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)

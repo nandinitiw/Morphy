@@ -8,7 +8,7 @@ class ParsedGame:
     white: str
     black: str
     result: str          # "1-0", "0-1", "1/2-1/2"
-    time_ocntrol: str
+    time_control: str
     eco: str             # Opening code e.g. "B20"
     opening_name: str
     positions: list[dict]  # List of {fen, move_played, clock_remaining, move_number}

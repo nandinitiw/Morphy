@@ -1,50 +1,41 @@
 import asyncio
 from collections import deque
 
-from backend.analysis.stockfish_worker import analyze_game_batch
-from backend.db.models import Game, Position
+from sqlalchemy.orm import Session
+
+from analysis.pipeline import process_game
+from analysis.stockfish_worker import stockfish_pool
 
 
 class AnalysisQueue:
     def __init__(self):
-        self._queue = deque()
+        self._queue: deque[str] = deque()
         self._running = False
 
     def enqueue(self, game_id: str):
         self._queue.append(game_id)
 
-    async def run_forever(self, db_session, fen_cache):
+    def enqueue_many(self, game_ids: list[str]):
+        self._queue.extend(game_ids)
+
+    async def run_forever(self, db_session_factory, fen_cache: dict | None = None):
         self._running = True
+        fen_cache = fen_cache or {}
+
         while self._running:
             if self._queue:
                 game_id = self._queue.popleft()
-                await self._process_game(game_id, db_session, fen_cache)
-
+                db = db_session_factory()
+                try:
+                    engine = await stockfish_pool.get_engine()
+                    await process_game(game_id, db, fen_cache, engine)
+                finally:
+                    db.close()
             else:
-                await asyncio.sleep(2)  # Poll every 2s when idle
+                await asyncio.sleep(2)
 
-    async def _process_game(self, game_id: str, db, fen_cache: dict):
+    def stop(self):
+        self._running = False
 
-        game = db.query(Game).filter(Game.id == game_id).first()
-        if not game:
-            raise ValueError(f"Game {game_id} not found")
 
-        positions = (
-            db.query(Position)
-            .filter(Position.game_id == game_id)
-            .order_by(Position.move_number)
-            .all()
-        )
-        position_dicts = [
-            {"fen": p.fen, "move_played": p.move_played} for p in positions
-        ]
-
-        results = await analyze_game_batch(position_dicts, fen_cache)
-
-        for position, result in zip(positions, results):
-            position.best_move = result["best_move"]
-            position.centipawn_loss = result["centipawn_loss"]
-            position.classification = result["classification"]
-
-        game.analyzed = True
-        db.commit()
+analysis_queue = AnalysisQueue()
