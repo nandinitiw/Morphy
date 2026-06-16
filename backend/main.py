@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
@@ -10,7 +11,7 @@ from agent.coach_agent import run_coach_session
 from analysis.jobs import create_ingest_job, get_ingest_job, run_ingest_job, serialize_job
 from analysis.stockfish_worker import stockfish_pool
 from db.database import get_db
-from db.models import WeaknessProfile
+from db.models import Game, Position, WeaknessProfile
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+_default_origins = "http://localhost:5173,http://localhost:5174"
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", _default_origins).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app"),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -86,13 +95,29 @@ async def job_status(job_id: str, db: Session = Depends(get_db)):
 
 @app.get("/profile/{username}")
 async def get_profile(username: str, db: Session = Depends(get_db)):
-    """Return weakness profile + stats for the dashboard."""
+    """Return weakness profile + summary stats for the dashboard."""
+    username = username.lower()
     profiles = (
         db.query(WeaknessProfile)
         .filter_by(username=username)
         .order_by(WeaknessProfile.severity.desc())
         .all()
     )
+
+    games_analyzed = (
+        db.query(Game).filter_by(username=username, analyzed=True).count()
+    )
+    blunders = (
+        db.query(Position)
+        .join(Game)
+        .filter(
+            Game.username == username,
+            Position.is_your_move.is_(True),
+            Position.classification == "blunder",
+        )
+        .count()
+    )
+
     return {
         "profile": [
             {
@@ -103,5 +128,10 @@ async def get_profile(username: str, db: Session = Depends(get_db)):
                 "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
             }
             for profile in profiles
-        ]
+        ],
+        "stats": {
+            "games_analyzed": games_analyzed,
+            "blunder_rate": round(blunders / games_analyzed, 2) if games_analyzed else 0,
+            "total_blunders": blunders,
+        },
     }

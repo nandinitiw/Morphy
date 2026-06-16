@@ -2,9 +2,12 @@ import { useState } from "react";
 
 import Coach from "./components/coach.jsx";
 import Dashboard from "./components/dashboard.jsx";
+import IngestBanner from "./components/IngestBanner.jsx";
 import Openings from "./components/openings.jsx";
 import StyleGap from "./components/stylegap.jsx";
+import UsernameSetup from "./components/UsernameSetup.jsx";
 import Weaknesses from "./components/weaknesses.jsx";
+import { useUsername } from "./context/UsernameContext.jsx";
 import "./App.css";
 
 const NAV = [
@@ -23,10 +26,15 @@ const PAGES = {
   style: StyleGap,
 };
 
-const USERNAME = import.meta.env.VITE_USERNAME ?? "your_chess_com_username";
-
 export default function App() {
+  const { username, clearUsername } = useUsername();
   const [page, setPage] = useState("dashboard");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  if (!username) {
+    return <UsernameSetup />;
+  }
+
   const Page = PAGES[page];
 
   return (
@@ -47,14 +55,15 @@ export default function App() {
           </button>
         ))}
         <div className="sidebar-footer">
-          <div className="user-pill">
-            <div className="avatar">{USERNAME.slice(0, 2).toUpperCase()}</div>
-            <div className="user-name">{USERNAME}</div>
-          </div>
+          <button type="button" className="user-pill" onClick={clearUsername} title="Change username">
+            <div className="avatar">{username.slice(0, 2).toUpperCase()}</div>
+            <div className="user-name">{username}</div>
+          </button>
         </div>
       </nav>
       <main className="main">
-        <Page username={USERNAME} />
+        <IngestBanner username={username} onComplete={() => setRefreshKey((k) => k + 1)} />
+        <Page username={username} refreshKey={refreshKey} />
       </main>
     </div>
   );

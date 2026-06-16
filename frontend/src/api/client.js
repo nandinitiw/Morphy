@@ -1,67 +1,101 @@
 // All backend API calls live here.
-// Set VITE_API_URL in your .env file: VITE_API_URL=http://localhost:8000
+//
+// Local dev: leave VITE_API_URL empty — Vite proxies to localhost:8000 (see vite.config.js)
+// Production (Vercel): set VITE_API_URL to your hosted backend, e.g. https://morphy-api.onrender.com
 
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
+export function getApiBase() {
+  return BASE || window.location.origin;
+}
+
+const THEME_LABELS = {
+  missed_fork: "Missed fork",
+  missed_pin: "Missed pin",
+  missed_skewer: "Missed skewer",
+  missed_mate: "Missed mate",
+  missed_check: "Missed check",
+  missed_discovered_check: "Missed discovered check",
+  missed_double_check: "Missed double check",
+  missed_hanging_piece: "Missed hanging piece",
+  missed_back_rank: "Back rank",
+  king_safety: "King safety",
+  time_pressure: "Time pressure",
+  positional: "Positional",
+};
+
+export function themeLabel(theme) {
+  return THEME_LABELS[theme] ?? theme.replace(/_/g, " ");
+}
+
+function apiUrl(path) {
+  return `${BASE}${path}`;
+}
+
+async function request(path, options = {}) {
+  const url = apiUrl(path);
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      throw new Error(`API error ${res.status} for ${path}`);
+    }
+    return res.json();
+  } catch (err) {
+    if (err instanceof TypeError || err.message === "Failed to fetch") {
+      throw new Error(
+        BASE
+          ? `Cannot reach backend at ${BASE}. Check that the server is running and CORS allows this site.`
+          : `Cannot reach backend at ${window.location.origin}${path}. Start the API with: cd backend && uvicorn main:app --reload --port 8000`,
+      );
+    }
+    throw err;
+  }
+}
 
 async function get(path) {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json();
+  return request(path);
 }
 
 async function post(path, body) {
-  const res = await fetch(`${BASE}${path}`, {
+  return request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json();
 }
 
-// ── Profile & stats ──────────────────────────────────────────────────────────
+export function checkBackendHealth() {
+  return get("/health");
+}
 
-/** Returns { win_rate, avg_accuracy, blunder_rate, games_analyzed, accuracy_trend } */
-export const fetchProfile = (username) => get(`/profile/${username}`);
+export function fetchProfile(username) {
+  return get(`/profile/${username}`);
+}
 
-/** Returns { weaknesses: [{ theme, frequency, severity, last_seen }] } */
-export const fetchWeaknessProfile = (username) => get(`/profile/${username}/weaknesses`);
+export async function fetchWeaknessProfile(username) {
+  const data = await fetchProfile(username);
+  return {
+    weaknesses: (data.profile ?? []).map((row) => ({
+      theme: row.theme,
+      display: themeLabel(row.theme),
+      frequency: row.frequency,
+      severity: Math.round(row.severity),
+      last_seen: row.last_seen,
+    })),
+    stats: data.stats ?? {},
+  };
+}
 
-/** Returns { time_buckets: { "0-15s": 0.29, ... }, critical_threshold_seconds: 22, insight: "..." } */
 export const fetchTimePressure = (username) => get(`/profile/${username}/time-pressure`);
 
-// ── Openings ─────────────────────────────────────────────────────────────────
-
-/** Returns { openings: [{ eco, name, games, win_rate, draw_rate, loss_rate, avg_accuracy }] } */
 export const fetchOpeningStats = (username) => get(`/openings/${username}`);
 
-// ── Style gap ─────────────────────────────────────────────────────────────────
-
-/**
- * Returns {
- *   you: { development, open_files, king_attack, sacrifice_rate, aggression },
- *   morphy: { ... same keys ... },
- *   summary: "..."
- * }
- */
 export const fetchStyleGap = (username, gmUsername = "paulmorphy") =>
   get(`/style-gap/${username}?gm=${gmUsername}`);
 
-// ── Coach agent ───────────────────────────────────────────────────────────────
-
-/**
- * Sends a message to the coach agent.
- * Returns { response: "..." }
- * The agent will call tools server-side before replying.
- */
 export const sendCoachMessage = (username, message) =>
   post(`/coach`, { username, message });
 
-// ── Ingestion ─────────────────────────────────────────────────────────────────
+export const triggerIngest = (username) => post(`/ingest/${username}`, {});
 
-/** Triggers a fresh ingestion + analysis run. Returns { job_id, status } */
-export const triggerIngest = (username) =>
-  post(`/ingest/${username}`, {});
-
-/** Polls the status of an ingestion job. Returns { status, games_processed, games_total } */
 export const fetchIngestStatus = (jobId) => get(`/jobs/${jobId}`);

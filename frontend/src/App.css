@@ -104,7 +104,21 @@ body {
   border-top: 0.5px solid rgba(255,255,255,0.08);
 }
 
-.user-pill { display: flex; align-items: center; gap: 8px; }
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.user-pill:hover .user-name {
+  color: var(--gold);
+}
 
 .avatar {
   width: 28px;
@@ -444,4 +458,197 @@ body {
   background: rgba(192,57,43,0.1);
   border-radius: 6px;
   border-left: 2px solid var(--red);
+}
+
+/* ── Username setup ── */
+.setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0D0D0F;
+}
+
+.setup-card {
+  width: 100%;
+  max-width: 420px;
+  background: #111114;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 32px 28px;
+}
+
+.setup-logo {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--gold);
+  letter-spacing: -0.5px;
+}
+
+.setup-tagline {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: rgba(232,227,213,0.35);
+  margin: 6px 0 24px;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(232,227,213,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setup-input {
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: #E8E3D5;
+  font-family: var(--sans);
+  outline: none;
+}
+
+.setup-input:focus {
+  border-color: var(--gold);
+}
+
+.setup-btn {
+  margin-top: 6px;
+  background: var(--gold);
+  color: #0D0D0F;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+
+.setup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.setup-error {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--red);
+}
+
+.setup-progress {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 0.5px solid rgba(255,255,255,0.08);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: rgba(232,227,213,0.55);
+}
+
+.setup-progress-status strong {
+  color: var(--gold);
+  text-transform: capitalize;
+}
+
+.setup-progress-detail {
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.setup-success { color: var(--green); }
+.setup-footnote {
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(232,227,213,0.35);
+}
+
+.setup-backend-warning {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(192,57,43,0.08);
+  border: 0.5px solid rgba(192,57,43,0.25);
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(232,227,213,0.7);
+}
+
+.setup-backend-warning code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gold);
+}
+
+.setup-backend-ok {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+}
+
+/* ── Ingest banner ── */
+.ingest-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: rgba(232,227,213,0.55);
+}
+
+.ingest-banner-error {
+  border-color: rgba(192,57,43,0.35);
+  background: rgba(192,57,43,0.06);
+}
+
+.ingest-banner-text strong {
+  color: #E8E3D5;
+}
+
+.ingest-banner-detail {
+  color: rgba(232,227,213,0.4);
+}
+
+.ingest-error { color: var(--red); }
+
+.ingest-banner-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 0.5px solid rgba(255,255,255,0.15);
+  color: rgba(232,227,213,0.7);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ingest-banner-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.empty-copy {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(232,227,213,0.45);
+  margin-top: 8px;
 }
