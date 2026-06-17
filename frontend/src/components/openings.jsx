@@ -1,78 +1,159 @@
-import { useEffect, useRef, useState } from "react";
-import { fetchOpeningStats } from "../api/client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchOpeningStats, sendCoachMessage } from "../api/client";
 import Chart from "chart.js/auto";
 
-const MOCK_OPENINGS = {
-  white: [
-    { eco: "C50", name: "Italian Game", games: 31, win_rate: 68, draw_rate: 10, loss_rate: 22, avg_accuracy: 18 },
-    { eco: "C60", name: "Ruy Lopez", games: 24, win_rate: 54, draw_rate: 12, loss_rate: 34, avg_accuracy: 24 },
-    { eco: "C30", name: "King's Gambit", games: 11, win_rate: 45, draw_rate: 9, loss_rate: 46, avg_accuracy: 28 },
-    { eco: "D02", name: "London System", games: 8, win_rate: 75, draw_rate: 12, loss_rate: 13, avg_accuracy: 16 },
-  ],
-  black: [
-    { eco: "B20", name: "Sicilian Defense", games: 42, win_rate: 60, draw_rate: 8, loss_rate: 32, avg_accuracy: 21 },
-    { eco: "C00", name: "French Defense", games: 18, win_rate: 39, draw_rate: 17, loss_rate: 44, avg_accuracy: 31 },
-    { eco: "B10", name: "Caro-Kann", games: 13, win_rate: 62, draw_rate: 15, loss_rate: 23, avg_accuracy: 19 },
-    { eco: "E60", name: "King's Indian", games: 9, win_rate: 44, draw_rate: 11, loss_rate: 45, avg_accuracy: 26 },
-  ],
-};
+const CHART_GREEN = "#22C55E";
+const CHART_RED = "#EF4444";
+const CHART_AMBER = "#F59E0B";
 
-function OpeningRow({ opening }) {
+function OpeningRow({ opening, color, onSelect, selected, summary, summaryLoading }) {
   const isWin = opening.win_rate >= 55;
+  const notation = opening.moves_notation || "—";
+  const example = opening.example_game;
+
   return (
-    <div className="opening-row">
-      <span className="opening-name">{opening.name} <span style={{ opacity: 0.4, fontFamily: "var(--mono)", fontSize: 11 }}>({opening.eco})</span></span>
-      <span className="opening-games">{opening.games}</span>
-      <div className="win-bar-wrap">
-        <div className="win-seg" style={{ width: `${opening.win_rate}%`, background: "#4A9B7F" }} />
-        <div className="win-seg" style={{ width: `${opening.draw_rate}%`, background: "rgba(255,255,255,0.2)" }} />
-        <div className="win-seg" style={{ width: `${opening.loss_rate}%`, background: "#C0392B" }} />
+    <div className="opening-row-wrap">
+      <div
+        className={`opening-row ${selected ? "opening-row-selected" : ""}`}
+        onClick={() => onSelect(opening, color)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && onSelect(opening, color)}
+      >
+        <span className="opening-name" title={notation}>
+          {opening.name}
+          <span className="opening-eco">({opening.eco})</span>
+          <span className="opening-notation">{notation}</span>
+        </span>
+        <span className="opening-games">{opening.games}</span>
+        <div
+          className="win-bar-wrap"
+          title={
+            example
+              ? `W ${opening.win_rate}% · D ${opening.draw_rate}% · L ${opening.loss_rate}% — see example from game #${example.game_id.slice(-6)}`
+              : `W ${opening.win_rate}% · D ${opening.draw_rate}% · L ${opening.loss_rate}%`
+          }
+        >
+          <div className="win-seg win-seg-win" style={{ width: `${opening.win_rate}%` }} />
+          <div className="win-seg win-seg-draw" style={{ width: `${opening.draw_rate}%` }} />
+          <div className="win-seg win-seg-loss" style={{ width: `${opening.loss_rate}%` }} />
+        </div>
+        <span className={`badge ${isWin ? "badge-win" : "badge-loss"}`}>{opening.win_rate}%</span>
+        {example && (
+          <a
+            className="opening-example-link"
+            href={example.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Open example game on Chess.com"
+          >
+            #{example.game_id.slice(-6)}
+          </a>
+        )}
       </div>
-      <span className={`badge ${isWin ? "badge-win" : "badge-loss"}`}>{opening.win_rate}%</span>
+      {selected && (
+        <div className="opening-ai-summary">
+          <span className="ai-tip-badge">AI insight</span>
+          {summaryLoading ? (
+            <p className="ai-summary-text">Generating opening summary…</p>
+          ) : (
+            <p className="ai-summary-text">{summary}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Openings({ username }) {
+export default function Openings({ username, refreshKey = 0 }) {
   const [openings, setOpenings] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [summary, setSummary] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+  const askCoach = useCallback(
+    (prompt) => sendCoachMessage(username, prompt),
+    [username],
+  );
 
   useEffect(() => {
-    // TODO: fetchOpeningStats(username).then(setOpenings).catch(setError);
-    setOpenings(MOCK_OPENINGS);
-  }, [username]);
+    setLoading(true);
+    setError(null);
+    fetchOpeningStats(username)
+      .then(setOpenings)
+      .catch(setError)
+      .finally(() => setLoading(false));
+  }, [username, refreshKey]);
 
   useEffect(() => {
     if (!openings || !chartRef.current) return;
-    const isDark = matchMedia("(prefers-color-scheme: dark)").matches;
-    const textColor = isDark ? "rgba(232,227,213,0.4)" : "rgba(0,0,0,0.4)";
-    const gridColor = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
 
     const all = [...openings.white, ...openings.black];
-    const colors = all.map(o => o.avg_accuracy > 25 ? "#C0392B" : o.avg_accuracy > 20 ? "#BA7517" : "#4A9B7F");
+    const colors = all.map((o) =>
+      o.avg_accuracy > 25 ? CHART_RED : o.avg_accuracy > 20 ? CHART_AMBER : CHART_GREEN,
+    );
 
     if (chartInstance.current) chartInstance.current.destroy();
     chartInstance.current = new Chart(chartRef.current, {
       type: "bar",
       data: {
-        labels: all.map(o => o.name.split(" ").slice(0, 2).join(" ")),
+        labels: all.map((o) => `${o.eco}`),
         datasets: [{
-          data: all.map(o => o.avg_accuracy),
+          label: "Avg cp loss",
+          data: all.map((o) => o.avg_accuracy),
           backgroundColor: colors,
         }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const o = all[items[0].dataIndex];
+                return `${o.name} (${o.eco})`;
+              },
+              afterTitle: (items) => {
+                const o = all[items[0].dataIndex];
+                return o.moves_notation || "";
+              },
+              label: (ctx) => ` ${ctx.parsed.y} cp avg loss`,
+              afterLabel: (ctx) => {
+                const o = all[ctx.dataIndex];
+                if (o.example_game) {
+                  return `See example: game #${o.example_game.game_id.slice(-6)}`;
+                }
+                return "";
+              },
+            },
+          },
+        },
         scales: {
-          x: { ticks: { color: textColor, font: { size: 11, family: "DM Mono" }, autoSkip: false, maxRotation: 20 }, grid: { display: false } },
+          x: {
+            ticks: { color: "rgba(250,250,250,0.5)", font: { size: 10, family: "DM Mono" } },
+            grid: { display: false },
+            title: {
+              display: true,
+              text: "ECO code",
+              color: "rgba(250,250,250,0.4)",
+              font: { size: 11, family: "DM Mono" },
+            },
+          },
           y: {
-            ticks: { color: textColor, font: { size: 11, family: "DM Mono" } },
-            grid: { color: gridColor },
-            title: { display: true, text: "avg centipawn loss", color: textColor, font: { size: 11, family: "DM Mono" } },
+            ticks: { color: "rgba(250,250,250,0.4)", font: { size: 11, family: "DM Mono" } },
+            grid: { color: "rgba(255,255,255,0.07)" },
+            title: {
+              display: true,
+              text: "Centipawn loss (lower = better)",
+              color: "rgba(250,250,250,0.4)",
+              font: { size: 11, family: "DM Mono" },
+            },
           },
         },
       },
@@ -81,33 +162,91 @@ export default function Openings({ username }) {
     return () => chartInstance.current?.destroy();
   }, [openings]);
 
+  async function handleSelect(opening, color) {
+    const key = `${color}-${opening.eco}-${opening.name}`;
+    if (selected === key) {
+      setSelected(null);
+      return;
+    }
+    setSelected(key);
+    setSummary("");
+    setSummaryLoading(true);
+    try {
+      const text = await askCoach(
+        `In 2 short paragraphs, summarize my performance in the ${opening.name} (${opening.eco}) as ${color}. ` +
+        `Stats: ${opening.games} games, ${opening.win_rate}% wins, ${opening.avg_accuracy} cp avg loss. ` +
+        `Opening moves: ${opening.moves_notation || "unknown"}. ` +
+        `Give one concrete study recommendation.`,
+      );
+      setSummary(text);
+    } catch (err) {
+      setSummary(`Could not reach coach: ${err.message}`);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   if (error) return <div className="error">Failed to load openings: {error.message}</div>;
-  if (!openings) return <div className="loading">Loading...</div>;
+  if (loading) return <div className="loading">Loading openings…</div>;
+
+  const empty = openings.white.length === 0 && openings.black.length === 0;
 
   return (
     <div className="page">
       <div className="page-header">
         <div className="page-title">Opening repertoire</div>
-        <div className="page-sub">win rate by ECO code</div>
+        <div className="page-sub">hover rows for notation · click for AI opening summary</div>
       </div>
 
-      <div className="two-col">
+      {empty ? (
         <div className="card">
-          <div className="card-title">As white</div>
-          {openings.white.map(o => <OpeningRow key={o.eco} opening={o} />)}
+          <div className="card-title">No opening data yet</div>
+          <p className="empty-copy">Analyze games first — opening stats are built from your ingested PGNs.</p>
         </div>
-        <div className="card">
-          <div className="card-title">As black</div>
-          {openings.black.map(o => <OpeningRow key={o.eco} opening={o} />)}
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="two-col">
+            <div className="card">
+              <div className="card-title">As white</div>
+              {openings.white.map((o) => (
+                <OpeningRow
+                  key={`w-${o.eco}-${o.name}`}
+                  opening={o}
+                  color="white"
+                  onSelect={handleSelect}
+                  selected={selected === `white-${o.eco}-${o.name}`}
+                  summary={summary}
+                  summaryLoading={summaryLoading}
+                />
+              ))}
+            </div>
+            <div className="card">
+              <div className="card-title">As black</div>
+              {openings.black.map((o) => (
+                <OpeningRow
+                  key={`b-${o.eco}-${o.name}`}
+                  opening={o}
+                  color="black"
+                  onSelect={handleSelect}
+                  selected={selected === `black-${o.eco}-${o.name}`}
+                  summary={summary}
+                  summaryLoading={summaryLoading}
+                />
+              ))}
+            </div>
+          </div>
 
-      <div className="card">
-        <div className="card-title">Accuracy by opening (avg centipawn loss — lower is better)</div>
-        <div className="chart-wrap" style={{ height: 180 }}>
-          <canvas ref={chartRef} role="img" aria-label="Bar chart of average centipawn loss per opening" />
-        </div>
-      </div>
+          <div className="card">
+            <div className="card-title">
+              Accuracy by opening
+              <span className="card-hint">avg centipawn loss — hover bars for notation & example games</span>
+            </div>
+            <div className="chart-wrap" style={{ height: 200 }}>
+              <canvas ref={chartRef} role="img" aria-label="Bar chart of average centipawn loss per opening" />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

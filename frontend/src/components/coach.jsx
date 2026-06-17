@@ -9,64 +9,64 @@ const INITIAL_MESSAGES = [
   },
 ];
 
-// Tool calls the agent makes are streamed back as separate message objects
-// so we can render them inline in the chat for transparency.
 function Message({ msg }) {
   if (msg.type === "tool") {
     return <div className="tool-call">→ {msg.content}</div>;
   }
+  const isAi = msg.role === "coach";
   return (
     <div className={`msg ${msg.role}`}>
       <div className="msg-sender">{msg.role === "coach" ? "Morphy" : "you"}</div>
-      <div className="msg-bubble" dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, "<br/>") }} />
+      <div className={`msg-bubble ${isAi ? "msg-bubble-ai" : ""}`}>
+        {msg.content.split("\n").map((line, i) => (
+          <span key={i}>{line}{i < msg.content.split("\n").length - 1 && <br />}</span>
+        ))}
+      </div>
     </div>
   );
 }
 
-export default function Coach({ username }) {
+export default function Coach({ username, seedMessage }) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
+  const seededRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function send() {
-    const text = input.trim();
+  useEffect(() => {
+    if (seedMessage && !seededRef.current) {
+      seededRef.current = true;
+      setMessages((prev) => [
+        ...prev,
+        { role: "coach", type: "text", content: seedMessage },
+      ]);
+    }
+  }, [seedMessage]);
+
+  async function send(overrideText) {
+    const text = (overrideText ?? input).trim();
     if (!text || loading) return;
     setInput("");
 
-    setMessages(prev => [...prev, { role: "user", type: "text", content: text }]);
+    setMessages((prev) => [...prev, { role: "user", type: "text", content: text }]);
     setLoading(true);
 
     try {
-      // TODO: once your backend is running, this actually calls the agent.
-      // The backend runs the tool-use loop and returns { response, tool_calls_made }.
-      // For now, simulate the round-trip:
-      await new Promise(r => setTimeout(r, 400));
-      setMessages(prev => [...prev, { role: "coach", type: "tool", content: "get_recent_games(limit=5)" }]);
-      await new Promise(r => setTimeout(r, 300));
-      setMessages(prev => [...prev, { role: "coach", type: "tool", content: "get_weakness_profile()" }]);
-      await new Promise(r => setTimeout(r, 400));
-
-      // Swap this block for the real call:
-      // const { response, tool_calls_made } = await sendCoachMessage(username, text);
-      // tool_calls_made.forEach(tc => setMessages(prev => [...prev, { role: "coach", type: "tool", content: tc }]));
-      // setMessages(prev => [...prev, { role: "coach", type: "text", content: response }]);
-
-      setMessages(prev => [...prev, {
-        role: "coach",
-        type: "text",
-        content: "I've pulled your recent games and weakness profile. Your fork blindspot is still the highest-priority issue — it showed up 3 times in your last 5 games. Want me to generate a targeted puzzle set from Lichess?",
-      }]);
+      const response = await sendCoachMessage(username, text);
+      setMessages((prev) => [...prev, { role: "coach", type: "text", content: response }]);
     } catch (err) {
-      setMessages(prev => [...prev, {
-        role: "coach",
-        type: "text",
-        content: `Error reaching the backend: ${err.message}. Make sure your FastAPI server is running at the URL in your .env file.`,
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "coach",
+          type: "text",
+          content: `Error reaching the backend: ${err.message}. Make sure your FastAPI server is running and ANTHROPIC_API_KEY is set.`,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export default function Coach({ username }) {
     <div className="page">
       <div className="page-header">
         <div className="page-title">Coach session</div>
-        <div className="page-sub">agent · tool use enabled</div>
+        <div className="page-sub">AI coach · powered by Claude + your game data</div>
       </div>
 
       <div className="card" style={{ flex: 1 }}>
@@ -84,7 +84,7 @@ export default function Coach({ username }) {
           <div className="chat-messages">
             {messages.map((msg, i) => <Message key={i} msg={msg} />)}
             {loading && (
-              <div className="tool-call" style={{ opacity: 0.5 }}>thinking...</div>
+              <div className="tool-call ai-thinking">thinking…</div>
             )}
             <div ref={bottomRef} />
           </div>
@@ -93,13 +93,13 @@ export default function Coach({ username }) {
             <input
               className="chat-input"
               value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && send()}
-              placeholder="Ask your coach..."
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+              placeholder="Ask your coach…"
               disabled={loading}
             />
-            <button className="send-btn" onClick={send} disabled={loading}>
-              Send <i className="ti ti-arrow-right" aria-hidden="true" />
+            <button className="send-btn send-btn-ai" onClick={() => send()} disabled={loading}>
+              Send <i className="ti ti-sparkles" aria-hidden="true" />
             </button>
           </div>
         </div>

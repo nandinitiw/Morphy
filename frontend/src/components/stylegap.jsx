@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchStyleGap } from "../api/client";
+import { fetchStyleGap, sendCoachMessage } from "../api/client";
+import AiTooltip from "./AiTooltip";
+import RecommendButton from "./RecommendButton";
 import Chart from "chart.js/auto";
 
 const MOCK_STYLE = {
@@ -19,30 +21,40 @@ const STAT_LABELS = {
   development_speed: "Development speed",
 };
 
+const AXIS_HELP = {
+  Development: "How quickly you get pieces off the back rank and into the game.",
+  "Open files": "How often you contest or occupy open files with rooks.",
+  "King attack": "Frequency of kingside attacks and direct threats to the enemy king.",
+  Sacrifices: "Willingness to give material for initiative or attack.",
+  Aggression: "Overall tendency toward forcing, active play vs. quiet maneuvering.",
+};
+
+const BOARD_SAGE = "#E0D6C2";
+const SIGNAL_GREEN = "#22C55E";
+
 function isGoodForYou(key, youVal, morphyVal) {
-  // Heuristic: closer to Morphy = good
   const youNum = parseFloat(youVal);
   const morphyNum = parseFloat(morphyVal);
-  if (isNaN(youNum) || isNaN(morphyNum)) return null;
+  if (Number.isNaN(youNum) || Number.isNaN(morphyNum)) return null;
   return Math.abs(youNum - morphyNum) < Math.abs(morphyNum * 0.3) ? "good" : "bad";
 }
 
-export default function StyleGap({ username }) {
+export default function StyleGap({ username, onNavigateCoach }) {
   const [style, setStyle] = useState(null);
   const [error, setError] = useState(null);
+  const [recoLoading, setRecoLoading] = useState(false);
+  const [reco, setReco] = useState(null);
   const radarRef = useRef(null);
   const radarChart = useRef(null);
 
   useEffect(() => {
-    // TODO: fetchStyleGap(username).then(setStyle).catch(setError);
-    setStyle(MOCK_STYLE);
+    fetchStyleGap(username)
+      .then(setStyle)
+      .catch(() => setStyle(MOCK_STYLE));
   }, [username]);
 
   useEffect(() => {
     if (!style || !radarRef.current) return;
-    const isDark = matchMedia("(prefers-color-scheme: dark)").matches;
-    const textColor = isDark ? "rgba(232,227,213,0.4)" : "rgba(0,0,0,0.4)";
-    const gridColor = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
 
     const labels = ["Development", "Open files", "King attack", "Sacrifices", "Aggression"];
     const youData = [style.you.development, style.you.open_files, style.you.king_attack, style.you.sacrifice_rate, style.you.aggression];
@@ -57,36 +69,43 @@ export default function StyleGap({ username }) {
           {
             label: "You",
             data: youData,
-            borderColor: "#C9A84C",
-            backgroundColor: "rgba(201,168,76,0.1)",
+            borderColor: BOARD_SAGE,
+            backgroundColor: "rgba(224,214,194,0.12)",
             borderWidth: 2,
-            pointBackgroundColor: "#C9A84C",
-            pointRadius: 3,
+            pointBackgroundColor: BOARD_SAGE,
+            pointRadius: 4,
           },
           {
             label: "Morphy",
             data: morphyData,
-            borderColor: "#4A9B7F",
-            backgroundColor: "rgba(74,155,127,0.07)",
+            borderColor: SIGNAL_GREEN,
+            backgroundColor: "rgba(34,197,94,0.08)",
             borderWidth: 2,
             borderDash: [4, 3],
-            pointBackgroundColor: "#4A9B7F",
-            pointRadius: 3,
+            pointBackgroundColor: SIGNAL_GREEN,
+            pointRadius: 4,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: (ctx) => AXIS_HELP[ctx.label] ?? "",
+            },
+          },
+        },
         scales: {
           r: {
             min: 0,
             max: 100,
             ticks: { display: false },
-            pointLabels: { color: textColor, font: { size: 11, family: "DM Mono" } },
-            grid: { color: gridColor },
-            angleLines: { color: gridColor },
+            pointLabels: { color: "rgba(250,250,250,0.55)", font: { size: 11, family: "DM Mono" } },
+            grid: { color: "rgba(255,255,255,0.08)" },
+            angleLines: { color: "rgba(255,255,255,0.08)" },
           },
         },
       },
@@ -95,15 +114,56 @@ export default function StyleGap({ username }) {
     return () => radarChart.current?.destroy();
   }, [style]);
 
+  async function askRecommendations() {
+    if (!style) return;
+    setRecoLoading(true);
+    setReco(null);
+    const gaps = ["Development", "Open files", "King attack", "Sacrifices", "Aggression"]
+      .map((label, i) => {
+        const keys = ["development", "open_files", "king_attack", "sacrifice_rate", "aggression"];
+        const you = style.you[keys[i]];
+        const ref = style.morphy[keys[i]];
+        return `${label}: you ${you} vs Morphy ${ref}`;
+      })
+      .join("; ");
+    try {
+      const text = await sendCoachMessage(
+        username,
+        `Compare my style to Paul Morphy. Radar gaps: ${gaps}. ` +
+        `In 3 bullet points, tell me what to practice to close the biggest style gaps. Be specific.`,
+      );
+      setReco(text);
+    } catch (err) {
+      setReco(`Coach unavailable: ${err.message}`);
+    } finally {
+      setRecoLoading(false);
+    }
+  }
+
   if (error) return <div className="error">Failed to load style data: {error.message}</div>;
-  if (!style) return <div className="loading">Loading...</div>;
+  if (!style) return <div className="loading">Loading style comparison…</div>;
 
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">Style gap — Paul Morphy</div>
-        <div className="page-sub">your play vs. morphy's fingerprint</div>
+        <div>
+          <div className="page-title">Style gap — Paul Morphy</div>
+          <div className="page-sub">your play vs. Morphy&apos;s historical fingerprint</div>
+        </div>
+        <RecommendButton onClick={askRecommendations} loading={recoLoading} label="Give me recommendations" />
       </div>
+
+      {reco && (
+        <div className="card ai-insight-card">
+          <span className="ai-tip-badge">AI insight</span>
+          <p className="ai-summary-text">{reco}</p>
+          {onNavigateCoach && (
+            <button type="button" className="link-btn" onClick={() => onNavigateCoach(reco)}>
+              Continue in Coach →
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="card-title">Style comparison</div>
@@ -129,19 +189,22 @@ export default function StyleGap({ username }) {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card radar-card">
         <div className="card-title">
           Style radar
-          <div style={{ display: "flex", gap: 16, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 20, height: 2, background: "#C9A84C", display: "inline-block" }} /> You
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 20, height: 2, background: "#4A9B7F", display: "inline-block", borderTop: "2px dashed #4A9B7F" }} /> Morphy
-            </span>
+          <div className="radar-legend">
+            <span><i className="legend-swatch" style={{ background: BOARD_SAGE }} /> You</span>
+            <span><i className="legend-swatch legend-swatch-dashed" style={{ background: SIGNAL_GREEN }} /> Morphy</span>
           </div>
         </div>
-        <div className="chart-wrap" style={{ height: 240 }}>
+        <p className="radar-hint">
+          Hover each axis for what it measures.{" "}
+          <AiTooltip label="Why Morphy?">
+            Paul Morphy is the namesake — a 19th-century genius known for rapid development, open games, and ruthless attacks.
+            This radar is illustrative until full GM corpus analysis ships.
+          </AiTooltip>
+        </p>
+        <div className="chart-wrap" style={{ height: 280 }}>
           <canvas ref={radarRef} role="img" aria-label="Radar chart comparing your chess style to Paul Morphy" />
         </div>
       </div>

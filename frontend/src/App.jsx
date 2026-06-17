@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import About from "./components/About.jsx";
 import Coach from "./components/coach.jsx";
 import Dashboard from "./components/dashboard.jsx";
 import IngestBanner from "./components/IngestBanner.jsx";
@@ -16,44 +17,48 @@ const NAV = [
   { id: "weaknesses", label: "Weaknesses", icon: "ti-report-analytics" },
   { id: "coach", label: "Coach", icon: "ti-message-circle" },
   { id: "style", label: "Style gap", icon: "ti-user-star" },
+  { id: "about", label: "About", icon: "ti-info-circle" },
 ];
-
-const PAGES = {
-  dashboard: Dashboard,
-  openings: Openings,
-  weaknesses: Weaknesses,
-  coach: Coach,
-  style: StyleGap,
-};
 
 export default function App() {
   const { username, clearUsername } = useUsername();
   const [page, setPage] = useState("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [coachSeed, setCoachSeed] = useState(null);
 
   if (!username) {
     return <UsernameSetup />;
   }
 
-  const Page = PAGES[page];
+  function goToCoach(context) {
+    setCoachSeed(context ?? null);
+    setPage("coach");
+  }
+
+  function navigate(id) {
+    if (id !== "coach") setCoachSeed(null);
+    setPage(id);
+  }
 
   return (
     <div className="app">
       <nav className="sidebar">
         <div className="logo">
-          <div className="logo-name">Morphy</div>
-          <div className="logo-sub">chess coach agent</div>
+          <div className="logo-name">♟ Morphy</div>
+          <div className="logo-sub">chess coach · powered by AI</div>
         </div>
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            className={`nav-item ${page === n.id ? "active" : ""}`}
-            onClick={() => setPage(n.id)}
-          >
-            <i className={`ti ${n.icon}`} aria-hidden="true" />
-            {n.label}
-          </button>
-        ))}
+        <div className="nav-section">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              className={`nav-item ${page === n.id ? "active" : ""}`}
+              onClick={() => navigate(n.id)}
+            >
+              <i className={`ti ${n.icon}`} aria-hidden="true" />
+              <span>{n.label}</span>
+            </button>
+          ))}
+        </div>
         <div className="sidebar-footer">
           <button type="button" className="user-pill" onClick={clearUsername} title="Change username">
             <div className="avatar">{username.slice(0, 2).toUpperCase()}</div>
@@ -63,7 +68,14 @@ export default function App() {
       </nav>
       <main className="main">
         <IngestBanner username={username} onComplete={() => setRefreshKey((k) => k + 1)} />
-        <Page username={username} refreshKey={refreshKey} />
+        {page === "dashboard" && <Dashboard username={username} refreshKey={refreshKey} />}
+        {page === "openings" && <Openings username={username} refreshKey={refreshKey} />}
+        {page === "weaknesses" && (
+          <Weaknesses username={username} refreshKey={refreshKey} onNavigateCoach={goToCoach} />
+        )}
+        {page === "coach" && <Coach username={username} seedMessage={coachSeed} />}
+        {page === "style" && <StyleGap username={username} onNavigateCoach={goToCoach} />}
+        {page === "about" && <About />}
       </main>
     </div>
   );

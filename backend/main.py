@@ -2,7 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from agent.coach_agent import run_coach_session
 from analysis.jobs import create_ingest_job, get_ingest_job, run_ingest_job, serialize_job
 from analysis.stockfish_worker import stockfish_pool
 from db.database import get_db
-from db.models import Game, Position, WeaknessProfile
+from stats import aggregate_openings, build_profile, get_blunder_examples
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ async def root():
             "ingest": "POST /ingest/{username}",
             "job_status": "GET /jobs/{job_id}",
             "profile": "GET /profile/{username}",
+            "openings": "GET /openings/{username}",
         },
     }
 
@@ -94,44 +95,26 @@ async def job_status(job_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/profile/{username}")
-async def get_profile(username: str, db: Session = Depends(get_db)):
+async def get_profile(
+    username: str,
+    tc: str | None = Query(default=None, description="bullet, blitz, rapid, classical, or all"),
+    db: Session = Depends(get_db),
+):
     """Return weakness profile + summary stats for the dashboard."""
-    username = username.lower()
-    profiles = (
-        db.query(WeaknessProfile)
-        .filter_by(username=username)
-        .order_by(WeaknessProfile.severity.desc())
-        .all()
-    )
+    return build_profile(username, db, tc)
 
-    games_analyzed = (
-        db.query(Game).filter_by(username=username, analyzed=True).count()
-    )
-    blunders = (
-        db.query(Position)
-        .join(Game)
-        .filter(
-            Game.username == username,
-            Position.is_your_move.is_(True),
-            Position.classification == "blunder",
-        )
-        .count()
-    )
 
-    return {
-        "profile": [
-            {
-                "theme": profile.theme,
-                "frequency": profile.frequency,
-                "severity": profile.severity,
-                "last_seen": profile.last_seen.isoformat() if profile.last_seen else None,
-                "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
-            }
-            for profile in profiles
-        ],
-        "stats": {
-            "games_analyzed": games_analyzed,
-            "blunder_rate": round(blunders / games_analyzed, 2) if games_analyzed else 0,
-            "total_blunders": blunders,
-        },
-    }
+@app.get("/blunders/{username}")
+async def get_blunders(username: str, db: Session = Depends(get_db)):
+    """Return example blunder positions (with FEN) grouped by tactical theme."""
+    return {"blunders": get_blunder_examples(username, db)}
+
+
+@app.get("/openings/{username}")
+async def get_openings(
+    username: str,
+    tc: str | None = Query(default=None, description="bullet, blitz, rapid, classical, or all"),
+    db: Session = Depends(get_db),
+):
+    """Return opening repertoire stats split by color."""
+    return aggregate_openings(username, db, tc)

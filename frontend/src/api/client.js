@@ -21,15 +21,40 @@ const THEME_LABELS = {
   missed_back_rank: "Back rank",
   king_safety: "King safety",
   time_pressure: "Time pressure",
-  positional: "Positional",
+  positional: "Positional play",
+};
+
+const THEME_DESCRIPTIONS = {
+  missed_fork: "You missed a move that attacks two or more valuable pieces at once.",
+  missed_pin: "A piece was pinned to a more valuable piece behind it, and you didn't exploit or defend it.",
+  missed_skewer: "You missed a line where a valuable piece is attacked and must move, exposing another piece.",
+  missed_mate: "A forced checkmate was available and you played something else.",
+  missed_check: "You overlooked a strong checking move that wins material or creates a decisive threat.",
+  missed_discovered_check: "Moving one piece could have unveiled an attack from another — with check.",
+  missed_double_check: "Two pieces could have checked the king simultaneously — almost always devastating.",
+  missed_hanging_piece: "An undefended piece was there for the taking.",
+  missed_back_rank: "Your king was trapped on the back rank with a mating threat you missed.",
+  king_safety: "You left your king exposed — loose pawns, open files, or delayed castling.",
+  time_pressure: "Errors clustered when you were low on the clock.",
+  positional: "Not a single-shot tactic — slow mistakes like weak squares, bad trades, passive piece placement, or misjudging pawn structure. Stockfish found a clearly better plan you overlooked.",
 };
 
 export function themeLabel(theme) {
   return THEME_LABELS[theme] ?? theme.replace(/_/g, " ");
 }
 
+export function themeDescription(theme) {
+  return THEME_DESCRIPTIONS[theme] ?? "A recurring error pattern in your games.";
+}
+
 function apiUrl(path) {
   return `${BASE}${path}`;
+}
+
+function withTc(path, tc) {
+  if (!tc || tc === "all") return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}tc=${encodeURIComponent(tc)}`;
 }
 
 async function request(path, options = {}) {
@@ -68,34 +93,52 @@ export function checkBackendHealth() {
   return get("/health");
 }
 
-export function fetchProfile(username) {
-  return get(`/profile/${username}`);
+export function fetchProfile(username, tc = "all") {
+  return get(withTc(`/profile/${username}`, tc));
 }
 
-export async function fetchWeaknessProfile(username) {
-  const data = await fetchProfile(username);
+export async function fetchWeaknessProfile(username, tc = "all") {
+  const data = await fetchProfile(username, tc);
   return {
     weaknesses: (data.profile ?? []).map((row) => ({
       theme: row.theme,
       display: themeLabel(row.theme),
+      description: themeDescription(row.theme),
       frequency: row.frequency,
       severity: Math.round(row.severity),
       last_seen: row.last_seen,
     })),
     stats: data.stats ?? {},
+    meta: data.meta ?? {},
   };
 }
 
 export const fetchTimePressure = (username) => get(`/profile/${username}/time-pressure`);
 
-export const fetchOpeningStats = (username) => get(`/openings/${username}`);
+export const fetchOpeningStats = (username, tc = "all") =>
+  get(withTc(`/openings/${username}`, tc));
+
+export const fetchBlunderExamples = (username) =>
+  get(`/blunders/${username}`).then((d) => d.blunders ?? []);
 
 export const fetchStyleGap = (username, gmUsername = "paulmorphy") =>
   get(`/style-gap/${username}?gm=${gmUsername}`);
 
-export const sendCoachMessage = (username, message) =>
-  post(`/coach`, { username, message });
+export async function sendCoachMessage(username, message) {
+  const data = await post(`/coach`, { username, message });
+  return data.response ?? "";
+}
 
 export const triggerIngest = (username) => post(`/ingest/${username}`, {});
 
 export const fetchIngestStatus = (jobId) => get(`/jobs/${jobId}`);
+
+export function formatAnalysisSince(meta) {
+  if (!meta?.earliest_game) return null;
+  const start = new Date(meta.earliest_game);
+  if (Number.isNaN(start.getTime())) return null;
+  return start.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+export const CP_LOSS_EXPLANATION =
+  "Centipawn loss (cp) measures how much worse your move was vs. Stockfish's best line. 100 cp ≈ one pawn. Lower is better — under 20 cp is solid; 200+ cp is usually a blunder.";
