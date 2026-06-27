@@ -62,7 +62,9 @@ GM_REGISTRY: list[dict] = [
         "slug":        "carlsen",
         "display_name": "Magnus Carlsen",
         "birth_year":  1990,
-        "player_name": "DrNykterstein",  # Lichess username appears in headers
+        # "Carlsen" matches OTB PGN files (e.g. pgnmentor.com: "Carlsen,Magnus")
+        # "DrNykterstein" matches Lichess-downloaded PGNs where the username is used
+        "player_name": ["Carlsen", "DrNykterstein"],
     },
 ]
 # ─────────────────────────────────────────────────────────────────────────────

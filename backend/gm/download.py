@@ -91,7 +91,10 @@ def load_pgn(slug: str) -> str | None:
     """
     path = pgn_path(slug)
     if path.exists():
-        text = path.read_text(encoding="utf-8")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = path.read_text(encoding="latin-1")
         print(f"[download] Loaded {path.name} from disk ({text.count('[Event ')} games)")
         return text
 
