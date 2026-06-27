@@ -6,7 +6,7 @@ import Chart from "chart.js/auto";
 
 const STAT_LABELS = {
   avg_game_length:   "Avg game length",
-  sacrifice_rate:    "Piece sacrifice rate",
+  sacrifice_rate:    "Check frequency",
   open_file_control: "Open file control",
   king_attack_freq:  "King attack frequency",
   development_speed: "Development speed",
@@ -16,7 +16,7 @@ const AXIS_HELP = {
   Development: "How quickly you get pieces off the back rank and into the game.",
   "Open files": "How often you contest or occupy open files with rooks.",
   "King attack": "Frequency of kingside attacks and direct threats to the enemy king.",
-  Sacrifices: "Willingness to give material for initiative or attack.",
+  Sacrifices: "How often you give check — a reliable signal of tactical, attacking play.",
   Aggression: "Overall tendency toward forcing, active play vs. quiet maneuvering.",
 };
 
