@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# SQLite (use Postgres in prod; don't commit local dev DB)
+backend/morphy.db
+
+# Node
+node_modules/
+frontend/dist/
+
+# Env
+.env
+.env.local
+backend/.env
+
+# GM PGN files (large, sourced externally — see backend/gm/download.py)
+backend/gm/pgns/*.pgn
