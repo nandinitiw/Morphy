@@ -29,6 +29,10 @@ export default function UsernameSetup() {
     await startIngest(normalized);
   }
 
+  function handleDemo() {
+    setUsername("demo");
+  }
+
   return (
     <div className="setup-screen">
       <div className="setup-card">
@@ -57,6 +61,22 @@ export default function UsernameSetup() {
             {isRunning ? "Analyzing your games…" : "Analyze my games"}
           </button>
         </form>
+
+        <div className="setup-divider">
+          <span>or</span>
+        </div>
+
+        <button
+          type="button"
+          className="setup-btn setup-btn-demo"
+          onClick={handleDemo}
+          disabled={isRunning}
+        >
+          Try demo
+        </button>
+        <p className="setup-demo-note">
+          Explore with pre-loaded games — no Chess.com account needed.
+        </p>
 
         {job && (
           <div className="setup-progress">

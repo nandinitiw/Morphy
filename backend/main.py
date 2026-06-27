@@ -11,6 +11,7 @@ from agent.coach_agent import run_coach_session
 from analysis.jobs import create_ingest_job, get_ingest_job, run_ingest_job, serialize_job
 from analysis.stockfish_worker import stockfish_pool
 from db.database import get_db
+from demo.seed_demo import seed as seed_demo
 from stats import aggregate_openings, build_profile, get_blunder_examples, get_style_gap, list_gm_profiles
 
 logger = logging.getLogger(__name__)
@@ -109,6 +110,19 @@ async def get_profile(
 async def list_gms(db: Session = Depends(get_db)):
     """Return all seeded GM profiles available for style comparison."""
     return {"gms": list_gm_profiles(db)}
+
+
+@app.post("/demo/seed")
+async def seed_demo_data(reset: bool = Query(default=False)):
+    """
+    Seed (or re-seed) the demo user with pre-baked game + blunder data.
+    Safe to call multiple times; use ?reset=true to wipe and start fresh.
+    """
+    try:
+        seed_demo(reset=reset)
+        return {"status": "ok", "message": "Demo data seeded successfully."}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/style-gap/{username}")

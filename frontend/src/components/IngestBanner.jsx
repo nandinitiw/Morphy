@@ -12,6 +12,17 @@ const STATUS_LABELS = {
 export default function IngestBanner({ username, onComplete }) {
   const { job, error, isRunning, startIngest } = useIngest();
 
+  if (username === "demo") {
+    return (
+      <div className="ingest-banner ingest-banner-demo">
+        <div className="ingest-banner-text">
+          <strong>Demo mode</strong> — pre-loaded with 30 rapid games and 6 weakness themes.
+          Enter your Chess.com username on the home screen to analyze your own games.
+        </div>
+      </div>
+    );
+  }
+
   async function handleRefresh() {
     try {
       const finalJob = await startIngest(username);
