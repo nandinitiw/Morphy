@@ -223,7 +223,10 @@ def build_profile(username: str, db: Session, tc: str | None = None) -> dict:
         .all()
     )
 
-    if tc and tc != "all" and filtered_ids:
+    if tc and tc != "all" and not filtered_ids:
+        # Specific TC requested but no games for it — return empty rather than leaking all-time data
+        profile_rows = []
+    elif tc and tc != "all" and filtered_ids:
         theme_stats: dict[str, dict] = {}
         positions = (
             db.query(Position)

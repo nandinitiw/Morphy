@@ -32,10 +32,13 @@ export default function Dashboard({ username, refreshKey = 0 }) {
   }, [username, refreshKey, tc]);
 
   useEffect(() => {
+    if (accuracyChart.current) {
+      accuracyChart.current.destroy();
+      accuracyChart.current = null;
+    }
     if (!stats || !accuracyRef.current || weaknesses.length === 0) return;
 
     const top = weaknesses.slice(0, 6);
-    if (accuracyChart.current) accuracyChart.current.destroy();
     accuracyChart.current = new Chart(accuracyRef.current, {
       type: "bar",
       data: {
@@ -133,9 +136,11 @@ export default function Dashboard({ username, refreshKey = 0 }) {
 
       {weaknesses.length === 0 ? (
         <div className="card">
-          <div className="card-title">No weakness data yet</div>
+          <div className="card-title">{gamesAnalyzed === 0 && tc !== "all" ? `No ${tc} games found` : "No weakness data yet"}</div>
           <p className="empty-copy">
-            Run an analysis from the banner above. Once Stockfish finishes, your tactical blind spots will show up here.
+            {gamesAnalyzed === 0 && tc !== "all"
+              ? `You don't have any analyzed ${tc} games. Switch to a different time control or run an analysis first.`
+              : "Run an analysis from the banner above. Once Stockfish finishes, your tactical blind spots will show up here."}
           </p>
         </div>
       ) : (
