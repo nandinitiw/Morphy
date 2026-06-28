@@ -339,20 +339,7 @@ def compute_user_style(username: str, db: Session) -> dict:
     if not games:
         return {}
 
-    # Build a combined PGN where the username always appears as the correct color.
-    # For each game, overwrite the White/Black header so the compute function can find them.
-    pgn_parts: list[str] = []
-    for game in games:
-        if not game.raw_pgn:
-            continue
-        pgn = game.raw_pgn
-        # Replace player color header so the matcher finds username in PGN headers
-        if game.player_color == "white":
-            pgn = pgn.replace('[White "', f'[White "{username}\n[_OrigWhite "', 1)
-        else:
-            pgn = pgn.replace('[Black "', f'[Black "{username}\n[_OrigBlack "', 1)
-        pgn_parts.append(pgn)
-
+    pgn_parts = [g.raw_pgn for g in games if g.raw_pgn]
     combined = "\n\n".join(pgn_parts)
     return compute_style(combined, username)
 

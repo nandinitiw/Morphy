@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
         "/coach": { target: apiTarget, changeOrigin: true },
         "/health": { target: apiTarget, changeOrigin: true },
         "/openings": { target: apiTarget, changeOrigin: true },
+        "/style-gap": { target: apiTarget, changeOrigin: true },
+        "/gms": { target: apiTarget, changeOrigin: true },
+        "/blunders": { target: apiTarget, changeOrigin: true },
+        "/demo": { target: apiTarget, changeOrigin: true },
       },
     },
   };

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import Markdown from "react-markdown";
+import { Chessboard } from "react-chessboard";
 import { sendCoachMessage } from "../api/client";
 
 const INITIAL_MESSAGES = [
@@ -9,6 +11,42 @@ const INITIAL_MESSAGES = [
   },
 ];
 
+function ChessBoardBlock({ value }) {
+  try {
+    const { fen, label } = JSON.parse(value);
+    return (
+      <div className="coach-board">
+        <div className="coach-board-wrap">
+          <Chessboard
+            position={fen}
+            arePiecesDraggable={false}
+            boardWidth={240}
+            customDarkSquareStyle={{ backgroundColor: "#769656" }}
+            customLightSquareStyle={{ backgroundColor: "#eeeed2" }}
+          />
+        </div>
+        {label && <div className="coach-board-label">{label}</div>}
+      </div>
+    );
+  } catch {
+    return <code>{value}</code>;
+  }
+}
+
+function MarkdownComponents() {
+  return {
+    code({ className, children }) {
+      const lang = (className ?? "").replace("language-", "");
+      if (lang === "chess-board") {
+        return <ChessBoardBlock value={String(children).trim()} />;
+      }
+      return <code className={className}>{children}</code>;
+    },
+  };
+}
+
+const MD_COMPONENTS = MarkdownComponents();
+
 function Message({ msg }) {
   if (msg.type === "tool") {
     return <div className="tool-call">→ {msg.content}</div>;
@@ -18,9 +56,9 @@ function Message({ msg }) {
     <div className={`msg ${msg.role}`}>
       <div className="msg-sender">{msg.role === "coach" ? "Morphy" : "you"}</div>
       <div className={`msg-bubble ${isAi ? "msg-bubble-ai" : ""}`}>
-        {msg.content.split("\n").map((line, i) => (
-          <span key={i}>{line}{i < msg.content.split("\n").length - 1 && <br />}</span>
-        ))}
+        {isAi
+          ? <Markdown components={MD_COMPONENTS}>{msg.content}</Markdown>
+          : msg.content}
       </div>
     </div>
   );
@@ -30,8 +68,10 @@ export default function Coach({ username, seedMessage }) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const bottomRef = useRef(null);
   const seededRef = useRef(false);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -52,12 +92,12 @@ export default function Coach({ username, seedMessage }) {
     if (!text || loading) return;
     setInput("");
 
-    // Snapshot current messages before state update so we can build history synchronously
     const priorMessages = messages;
     setMessages((prev) => [...prev, { role: "user", type: "text", content: text }]);
     setLoading(true);
+    setElapsed(0);
+    timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
 
-    // Send prior conversation as history (text messages only, role coach→assistant)
     const history = priorMessages
       .filter((m) => m.type === "text")
       .map((m) => ({ role: m.role === "coach" ? "assistant" : "user", content: m.content }));
@@ -71,11 +111,13 @@ export default function Coach({ username, seedMessage }) {
         {
           role: "coach",
           type: "text",
-          content: `Error reaching the backend: ${err.message}. Make sure your FastAPI server is running and ANTHROPIC_API_KEY is set.`,
+          content: `Error: ${err.message}`,
         },
       ]);
     } finally {
+      clearInterval(timerRef.current);
       setLoading(false);
+      setElapsed(0);
     }
   }
 
@@ -91,7 +133,9 @@ export default function Coach({ username, seedMessage }) {
           <div className="chat-messages">
             {messages.map((msg, i) => <Message key={i} msg={msg} />)}
             {loading && (
-              <div className="tool-call ai-thinking">thinking…</div>
+              <div className="tool-call ai-thinking">
+                analysing your games{elapsed > 3 ? ` · ${elapsed}s` : "…"}
+              </div>
             )}
             <div ref={bottomRef} />
           </div>

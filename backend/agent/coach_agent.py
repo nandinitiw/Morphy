@@ -7,7 +7,12 @@ from agent.tools import TOOLS, execute_tool
 
 client = anthropic.Anthropic()
 MAX_TOOL_ITERATIONS = 10
+MAX_HISTORY_TURNS = 10
 MODEL = "claude-sonnet-4-6"
+
+# Tools list with cache_control on the last entry so the full tool
+# definition block is eligible for prompt caching.
+_TOOLS_CACHED = [*TOOLS[:-1], {**TOOLS[-1], "cache_control": {"type": "ephemeral"}}]
 
 
 async def run_coach_session(
@@ -16,14 +21,11 @@ async def run_coach_session(
     db,
     history: list[dict] | None = None,
 ) -> str:
-    """
-    Runs one turn of the coach agent with full conversation history.
-    history: list of {role: "user"|"assistant", content: str} from prior turns.
-    """
     messages: list[dict] = []
 
     if history:
-        for entry in history:
+        capped = history[-(MAX_HISTORY_TURNS * 2):]
+        for entry in capped:
             role = entry.get("role")
             content = entry.get("content", "")
             if role in ("user", "assistant") and content:
@@ -31,13 +33,28 @@ async def run_coach_session(
 
     messages.append({"role": "user", "content": user_message})
 
+    # System prompt as a list so we can attach cache_control.
+    # The static instructions are cached; the username line is appended
+    # separately so cache is shared across turns for the same user.
+    system = [
+        {
+            "type": "text",
+            "text": COACH_SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"},
+        },
+        {
+            "type": "text",
+            "text": f"You are coaching: {username}",
+        },
+    ]
+
     for _ in range(MAX_TOOL_ITERATIONS):
         response = await asyncio.to_thread(
             client.messages.create,
             model=MODEL,
             max_tokens=4096,
-            system=COACH_SYSTEM_PROMPT.format(username=username),
-            tools=TOOLS,
+            system=system,
+            tools=_TOOLS_CACHED,
             messages=messages,
         )
 

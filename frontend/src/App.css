@@ -523,6 +523,50 @@ body {
   background: var(--ai-violet-dim) !important;
 }
 
+/* Markdown rendering inside coach bubbles */
+.msg-bubble p { margin: 0 0 8px; }
+.msg-bubble p:last-child { margin-bottom: 0; }
+.msg-bubble h1, .msg-bubble h2, .msg-bubble h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+  color: var(--text);
+}
+.msg-bubble h1:first-child, .msg-bubble h2:first-child, .msg-bubble h3:first-child { margin-top: 0; }
+.msg-bubble strong { color: var(--text); font-weight: 600; }
+.msg-bubble ul, .msg-bubble ol { margin: 4px 0 8px 16px; padding: 0; }
+.msg-bubble li { margin-bottom: 3px; }
+.msg-bubble code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(255,255,255,0.07);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.msg-bubble a { color: #a78bfa; text-decoration: underline; }
+.msg-bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+/* Embedded chess board in coach messages */
+.coach-board {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 8px 0;
+  gap: 6px;
+}
+.coach-board-wrap {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.coach-board-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  max-width: 240px;
+}
+
 .tool-call {
   font-size: 11px;
   font-family: var(--mono);

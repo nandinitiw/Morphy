@@ -200,21 +200,44 @@ def _get_opening_stats(username: str, db: Session) -> str:
     return "\n".join(lines)
 
 
+# Map internal weakness theme names → Lichess puzzle theme slugs
+_LICHESS_THEME_MAP = {
+    "missed_fork": "fork",
+    "missed_pin": "pin",
+    "missed_skewer": "skewer",
+    "missed_mate": "mate",
+    "missed_check": "check",
+    "missed_discovered_check": "discoveredAttack",
+    "missed_double_check": "doubleCheck",
+    "missed_hanging_piece": "hangingPiece",
+    "missed_back_rank": "backRankMate",
+    "king_safety": "kingsideAttack",
+    "positional": "advantage",
+}
+
+
 async def _fetch_puzzles(theme: str, limit: int) -> str:
-    url = f"https://lichess.org/api/puzzle/batch?themes={theme}&nb={limit}"
+    lichess_theme = _LICHESS_THEME_MAP.get(theme, theme)
+    lines = [f"Practice puzzles for '{theme}':"]
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url)
-        if resp.status_code != 200:
-            return f"Could not fetch puzzles for theme '{theme}'"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for _ in range(limit):
+            try:
+                resp = await client.get(
+                    f"https://lichess.org/api/puzzle/next?theme={lichess_theme}",
+                    headers={"Accept": "application/json"},
+                )
+                if resp.status_code != 200:
+                    break
+                data = resp.json()
+                puzzle = data.get("puzzle", {})
+                pid = puzzle.get("id")
+                rating = puzzle.get("rating", "?")
+                if pid:
+                    lines.append(f"- https://lichess.org/training/{pid} (rating: {rating})")
+            except Exception:
+                break
 
-        puzzles = resp.json().get("puzzles", [])
-        lines = [f"Practice puzzles for '{theme}':"]
-
-        for puzzle in puzzles:
-            lines.append(
-                f"- https://lichess.org/training/{puzzle['puzzle']['id']} "
-                f"(rating: {puzzle['puzzle']['rating']})"
-            )
-
-        return "\n".join(lines)
+    if len(lines) == 1:
+        return f"Could not fetch puzzles for theme '{theme}' (lichess theme: '{lichess_theme}')"
+    return "\n".join(lines)

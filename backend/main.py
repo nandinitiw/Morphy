@@ -2,6 +2,10 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

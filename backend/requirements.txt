@@ -7,3 +7,4 @@ numpy>=2.0.0
 scikit-learn>=1.5.0
 apscheduler>=3.10.0
 anthropic>=0.40.0
+python-dotenv>=1.0.0

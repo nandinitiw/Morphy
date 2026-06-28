@@ -128,9 +128,24 @@ export const fetchStyleGap = (username, gmSlug = "morphy") =>
   get(`/style-gap/${username}?gm=${encodeURIComponent(gmSlug)}`);
 
 export async function sendCoachMessage(username, message, history = []) {
-  // history: [{role: "user"|"assistant", content: string}]
-  const data = await post(`/coach`, { username, message, history });
-  return data.response ?? "";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+  try {
+    const res = await fetch(apiUrl("/coach"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, message, history }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    return data.response ?? "";
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Coach timed out — the report took too long. Try a shorter question.");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const triggerIngest = (username) => post(`/ingest/${username}`, {});
