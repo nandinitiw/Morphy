@@ -1,10 +1,8 @@
 services:
   - type: web
     name: morphy-api
-    runtime: python
+    runtime: docker
     rootDir: backend
-    buildCommand: apt-get install -y stockfish && pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     disk:
       name: morphy-data
       mountPath: /data
@@ -12,8 +10,6 @@ services:
     envVars:
       - key: DATABASE_URL
         value: sqlite:////data/morphy.db
-      - key: STOCKFISH_PATH
-        value: /usr/games/stockfish
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: CORS_ORIGINS
