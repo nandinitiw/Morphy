@@ -90,6 +90,22 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/health/stockfish")
+async def health_stockfish():
+    import shutil
+    from pathlib import Path
+    candidates = [
+        os.getenv("STOCKFISH_PATH"),
+        shutil.which("stockfish"),
+        "/usr/games/stockfish",
+        "/usr/bin/stockfish",
+        "/usr/local/bin/stockfish",
+    ]
+    found = {p: Path(p).is_file() for p in candidates if p}
+    resolved = next((p for p, ok in found.items() if ok), None)
+    return {"resolved": resolved, "candidates": found}
+
+
 @app.post("/coach")
 async def coach(req: CoachRequest, db: Session = Depends(get_db)):
     response = await run_coach_session(req.username, req.message, db, history=req.history)
